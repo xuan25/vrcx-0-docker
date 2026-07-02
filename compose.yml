@@ -1,0 +1,33 @@
+x-vrcx-build: &vrcx-build
+  build:
+    context: ./docker
+  # image: ghcr.io/your-org/vrcx-vnc:2.10.0
+
+x-vrcx-data: &vrcx-data
+  - ./data/config:/home/vncuser/.config
+  - ./data/local-share:/home/vncuser/.local/share
+  - ./data/cache:/home/vncuser/.cache
+
+services:
+  permissions-init:
+    <<: *vrcx-build
+    user: "0:0"
+    restart: "no"
+    entrypoint: ["/usr/local/bin/fix-permissions.sh"]
+    volumes: *vrcx-data
+
+  vrcx:
+    <<: *vrcx-build
+    restart: unless-stopped
+
+    environment:
+      VNC_PASSWORD: ${VNC_PASSWORD:?Set VNC_PASSWORD in .env}
+
+    ports:
+      - "127.0.0.1:${NOVNC_PORT:-6080}:6080"
+
+    volumes: *vrcx-data
+
+    depends_on:
+      permissions-init:
+        condition: service_completed_successfully

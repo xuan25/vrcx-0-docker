@@ -1,0 +1,7 @@
+#!/bin/sh
+set -eu
+
+unset SESSION_MANAGER
+unset DBUS_SESSION_BUS_ADDRESS
+
+exec dbus-launch --exit-with-session /opt/vnc/app-session.sh
