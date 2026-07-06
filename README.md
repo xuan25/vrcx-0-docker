@@ -2,7 +2,7 @@
 
 Run the VRCX-0 Linux AppImage in a Docker container and access it through a browser with noVNC.
 
-The container starts TigerVNC, launches VRCX-0 in an Openbox session, and exposes noVNC on localhost. VRCX-0 state is persisted into bind-mounted directories under `data/`.
+The container starts a headless Cage Wayland kiosk session, exposes it through WayVNC, and serves noVNC with websockify on localhost. VRCX-0 state is persisted into bind-mounted directories under `data/`.
 
 ## Requirements
 
@@ -16,14 +16,15 @@ The container starts TigerVNC, launches VRCX-0 in an Openbox session, and expose
    cp .env.example .env
    ```
 
-2. Edit `.env` and set a VNC password:
+2. Edit `.env` and set noVNC credentials:
 
    ```env
+   VNC_USERNAME=vnc
    VNC_PASSWORD=changeit
    NOVNC_PORT=6080
    ```
 
-   TigerVNC only uses the first eight characters of the password, so use exactly eight characters.
+   `VNC_USERNAME` defaults to `vnc` if omitted.
 
 3. Build and start the container:
 

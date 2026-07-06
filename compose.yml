@@ -21,6 +21,7 @@ services:
     restart: unless-stopped
 
     environment:
+      VNC_USERNAME: ${VNC_USERNAME:-vnc}
       VNC_PASSWORD: ${VNC_PASSWORD:?Set VNC_PASSWORD in .env}
 
     ports:

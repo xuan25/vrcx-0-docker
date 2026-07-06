@@ -1,18 +1,55 @@
-FROM ubuntu:rolling
+FROM ubuntu:rolling AS cage-builder
 
 ENV DEBIAN_FRONTEND=noninteractive
 
+# Ubuntu's packaged Cage/wlroots trips a wlroots XWayland assertion with
+# the VRCX-0 AppImage. Build the same source with release assertions disabled.
+RUN set -eux; \
+    sed -i 's/^Types: deb$/Types: deb deb-src/' /etc/apt/sources.list.d/ubuntu.sources; \
+    apt-get update; \
+    apt-get install -y --no-install-recommends \
+        build-essential \
+        ca-certificates \
+        dpkg-dev \
+        meson \
+        ninja-build \
+        pkgconf; \
+    apt-get build-dep -y wlroots cage; \
+    mkdir -p /build; \
+    cd /build; \
+    apt-get source wlroots cage; \
+    cd /build/wlroots-*; \
+    meson setup build --buildtype=release -Db_ndebug=true -Dwerror=false --prefix=/usr/local; \
+    meson compile -C build; \
+    meson install -C build; \
+    cd /build/cage-*; \
+    PKG_CONFIG_PATH="/usr/local/lib/x86_64-linux-gnu/pkgconfig:/usr/local/lib/pkgconfig" \
+        meson setup build --buildtype=release -Db_ndebug=true --prefix=/usr/local --wrap-mode=nodownload; \
+    meson compile -C build; \
+    meson install -C build; \
+    strip /usr/local/bin/cage || true; \
+    rm -rf /build /var/lib/apt/lists/*
+
+FROM ubuntu:rolling
+
+ENV DEBIAN_FRONTEND=noninteractive
+ENV LD_LIBRARY_PATH=/usr/local/lib/x86_64-linux-gnu:/usr/local/lib
+
 RUN apt-get update && apt-get install -y \
-    tigervnc-standalone-server \
+    libwlroots-0.19 \
+    wayvnc \
     novnc \
     websockify \
-    openbox \
-    wmctrl \
-    x11-utils \
+    xwayland \
     dbus-x11 \
+    procps \
     curl \
     ca-certificates \
     && rm -rf /var/lib/apt/lists/*
+
+COPY --from=cage-builder /usr/local /usr/local
+
+RUN ldconfig && cage -v
 
 # UID 1000 is already occupied in your Ubuntu base image.
 # Use a fixed UID/GID so bind-mounted directories can be owned correctly.
@@ -20,18 +57,14 @@ RUN groupadd --gid 10001 vncuser && \
     useradd --uid 10001 --gid 10001 --create-home vncuser
 
 # configuration and desktop startup.
-COPY tigervnc/config.pl /etc/tigervnc/vncserver-config-mandatory
-COPY tigervnc/xstartup /opt/vnc/xstartup
-COPY openbox-kiosk.xml /opt/vnc/openbox-kiosk.xml
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh
 COPY fix-permissions.sh /usr/local/bin/fix-permissions.sh
 COPY app-session.sh /opt/vnc/app-session.sh
-COPY run-vnc.sh /usr/local/bin/run-vnc.sh
+COPY run-wayvnc.sh /usr/local/bin/run-wayvnc.sh
 
 RUN chmod 755 \
-/opt/vnc/xstartup \
 /opt/vnc/app-session.sh \
-/usr/local/bin/run-vnc.sh \
+/usr/local/bin/run-wayvnc.sh \
 /usr/local/bin/entrypoint.sh \
 /usr/local/bin/fix-permissions.sh
 
@@ -61,4 +94,4 @@ EXPOSE 6080
 
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
 
-CMD ["/usr/local/bin/run-vnc.sh"]
+CMD ["/usr/local/bin/run-wayvnc.sh"]
